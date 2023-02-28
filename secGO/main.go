@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -42,6 +43,11 @@ func main() {
 					getUser(db, w, r)
 				case "POST":
 					createUser(db, w, r)
+				case "PUT":
+					updateUser(db, w, r)
+				case "DELETE":
+					deleteUser(db, w, r)
+
 			default:
 					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			}
@@ -120,4 +126,42 @@ func createUser(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
+}
+
+func updateUser(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/user/")
+
+	var user User
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+	}
+
+	_, err = db.Exec("UPDATE user SET name = ?, email = ? WHERE id = ?", user.Name, user.Email, id)
+	if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+	}
+
+	user.ID, err = strconv.Atoi(id)
+	if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
+func deleteUser(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/user/")
+
+	_, err := db.Exec("DELETE FROM user WHERE id = ?", id)
+	if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
